@@ -7,18 +7,69 @@ from tokenizer import Tokenizer
 
 
 
+class Head (torch.nn.Module):
+
+    def __init__(self, head_size, n_embed, block_size) :
+        super().__init__()
+
+        self.key = torch.nn.Linear(n_embed, head_size, bias = False)
+        self.query = torch.nn.Linear(n_embed, head_size, bias = False)
+        self.value = torch.nn.Linear(n_embed, head_size, bias = False)
+
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+
+    def forward(self, x) :
+
+        B, T, C = x.shape
+
+        k = self.key(x)
+        q = self.query(x)
+
+        # compute attention scores
+        wei = q @ k.transpose(-2, -1) * C**-0.5
+        wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
+        wei = torch.nn.functional.softmax(wei, dim=-1)
+
+        # weighted aggregation
+        v = self.value(x)
+        out = wei @ v
+        return out
+
+class MultiHeadAttention(torch.nn.Module) :
+
+    def __init__(self, num_heads, head_size, n_embed, block_size) :
+        super().__init__()
+        self.heads = torch.nn.ModuleList([Head(head_size, n_embed, block_size) for _ in range(num_heads)])
+
+    def forward(self, x) :
+        return torch.cat([h(x) for h in self.heads], dim=-1)
+
 
 class BigramLanguageModel(torch.nn.Module) :
 
-    def __init__(self, vocab_size) :
+    def __init__(self, vocab_size, n_embed, block_size, device) :
         super().__init__()
-        self.token_embedding_table = torch.nn.Embedding(vocab_size, vocab_size)
+        self.token_embedding_table = torch.nn.Embedding(vocab_size, n_embed)
+        self.position_embedding_table = torch.nn.Embedding(block_size, n_embed)
         self.vocab_size = vocab_size
+        self.n_embed = n_embed
+        self.device = device
+
+        self.block_size = block_size
+
+        self.sa_heads = MultiHeadAttention(num_heads = 4, head_size = n_embed // 4, n_embed = n_embed, block_size = block_size)
+        self.lm_head = torch.nn.Linear(n_embed, vocab_size)
 
     def forward(self, idx, targets=None) :
 
+        B, T = idx.shape
+
         # BTC = (rows, cols, possible_next_tokens)
-        logits = self.token_embedding_table(idx) # (B, T, C)
+        tok_emb = self.token_embedding_table(idx) # (B, T, C)
+        pos_emb = self.position_embedding_table(torch.arange(T, device = self.device)) # (T, C)
+        x = tok_emb + pos_emb
+        x = self.sa_heads(x) # apply head of self attention
+        logits = self.lm_head(x) # (B, T, vocab_size)
 
         if targets is None:
             loss = None
@@ -36,7 +87,10 @@ class BigramLanguageModel(torch.nn.Module) :
     def generate(self, idx, max_new_tokens) :
 
         for _ in range(max_new_tokens) :
-            logits, loss = self(idx)
+
+            idx_cond = idx[:, -self.block_size:]
+
+            logits, loss = self(idx_cond)
 
             logits = logits[:, -1, :]
 
@@ -59,11 +113,12 @@ class Train :
 
         self.batch_size = 32
         self.block_size = 8
-        self.max_iters = 3000
+        self.max_iters = 5000
         self.eval_interval = 300
-        self.learning_rate = 1e-2
+        self.learning_rate = 1e-3
         self.device = "cpu"
         self.eval_iters = 200
+        self.n_embed = 32
 
         self.vocab_size = vocab_size
         self.tokenizer = tokenizer
@@ -85,7 +140,7 @@ class Train :
 
     def run_training(self) :
 
-        model = BigramLanguageModel(vocab_size = self.vocab_size)
+        model = BigramLanguageModel(vocab_size = self.vocab_size, n_embed= self.n_embed, block_size = self.block_size, device = self.device)
         print("Model initialised")
         m = model.to(self.device)
         print("Model device set")
