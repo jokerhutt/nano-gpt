@@ -5,18 +5,33 @@ import math
 
 from tokenizer import Tokenizer
 
-
+batch_size = 64
+block_size = 256
+max_iters = 5000
+eval_interval = 500
+learning_rate = 3e-4
+device = (
+    "cuda" if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available()
+    else "cpu"
+)
+eval_iters = 200
+n_embed = 384
+n_head = 6
+n_layer = 6
+dropout = 0.2
 
 class Head (torch.nn.Module):
 
-    def __init__(self, head_size, n_embed, block_size) :
+    def __init__(self, head_size) :
         super().__init__()
 
         self.key = torch.nn.Linear(n_embed, head_size, bias = False)
         self.query = torch.nn.Linear(n_embed, head_size, bias = False)
         self.value = torch.nn.Linear(n_embed, head_size, bias = False)
-
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+
+        self.dropout = torch.nn.Dropout(dropout)
 
     def forward(self, x) :
 
@@ -26,9 +41,10 @@ class Head (torch.nn.Module):
         q = self.query(x)
 
         # compute attention scores
-        wei = q @ k.transpose(-2, -1) * C**-0.5
+        wei = q @ k.transpose(-2, -1) * k.shape[-1]**-0.5
         wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
         wei = torch.nn.functional.softmax(wei, dim=-1)
+        wei = self.dropout(wei)
 
         # weighted aggregation
         v = self.value(x)
@@ -37,25 +53,27 @@ class Head (torch.nn.Module):
 
 class MultiHeadAttention(torch.nn.Module) :
 
-    def __init__(self, num_heads, head_size, n_embed, block_size) :
+    def __init__(self, num_heads, head_size) :
         super().__init__()
-        self.heads = torch.nn.ModuleList([Head(head_size, n_embed, block_size) for _ in range(num_heads)])
-        self.proj = torch.nn.Linear(num_heads, n_embed)
+        self.heads = torch.nn.ModuleList([Head(head_size) for _ in range(num_heads)])
+        self.proj = torch.nn.Linear(head_size * num_heads, n_embed)
+        self.dropout = torch.nn.Dropout(dropout)
 
     def forward(self, x) :
         out = torch.cat([h(x) for h in self.heads], dim=-1)
-        out = self.proj(out)
+        out = self.dropout(self.proj(out))
         return out
 
 class FeedForward(torch.nn.Module) :
 
-    def __init__(self, n_embed) :
+    def __init__(self, n_embd) :
 
         super().__init__()
         self.net = torch.nn.Sequential(
-            torch.nn.Linear(n_embed, 4 * n_embed),
+            torch.nn.Linear(n_embd, 4 * n_embd),
             torch.nn.ReLU(),
-            torch.nn.Linear(4 * n_embed, n_embed)
+            torch.nn.Linear(4 * n_embd, n_embd),
+            torch.nn.Dropout(dropout)
         )
 
     def forward(self, x):
@@ -63,52 +81,57 @@ class FeedForward(torch.nn.Module) :
 
 class Block(torch.nn.Module) :
 
-    def __init__(self, n_embed, n_head, block_size) :
+    def __init__(self, n_embd, n_head) :
 
         super().__init__()
 
-        head_size = n_embed // n_head
-        self.sa = MultiHeadAttention(n_head, head_size, n_embed, block_size)
-        self.ffwd = FeedForward(n_embed)
+        head_size = n_embd // n_head
+        self.sa = MultiHeadAttention(n_head, head_size)
+        self.ffwd = FeedForward(n_embd)
+        self.ln1 = torch.nn.LayerNorm(n_embd)
+        self.ln2 = torch.nn.LayerNorm(n_embd)
 
     def forward(self, x):
-        x = x + self.sa(x)
-        x = x + self.ffwd(x)
-
+        x = x + self.sa(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
         return x
 
 
 class BigramLanguageModel(torch.nn.Module) :
 
-    def __init__(self, vocab_size, n_embed, block_size, device) :
+    def __init__(self, vocab_size) :
         super().__init__()
 
         self.vocab_size = vocab_size
-        self.n_embed = n_embed
-        self.device = device
-        self.block_size = block_size
 
         self.token_embedding_table = torch.nn.Embedding(vocab_size, n_embed)
         self.position_embedding_table = torch.nn.Embedding(block_size, n_embed)
         
-        self.blocks = torch.nn.Sequential(
-            Block(n_embed = n_embed, n_head = 4, block_size = block_size),
-            Block(n_embed = n_embed, n_head = 4, block_size = block_size),
-            Block(n_embed = n_embed, n_head = 4, block_size = block_size),
-        )
-
+        self.blocks = torch.nn.Sequential(*[Block(n_embed, n_head) for _ in range(n_layer)])
+        self.ln_f = torch.nn.LayerNorm(n_embed)
         self.lm_head = torch.nn.Linear(n_embed, vocab_size)
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, torch.nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, torch.nn.Embedding) :
+            torch.nn.init.normal_(module.weight, mean = 0.0, std = 0.02)
 
     def forward(self, idx, targets=None) :
 
         B, T = idx.shape
 
-        # BTC = (rows, cols, possible_next_tokens)
         tok_emb = self.token_embedding_table(idx) # (B, T, C)
-        pos_emb = self.position_embedding_table(torch.arange(T, device = self.device)) # (T, C)
+        pos_emb = self.position_embedding_table(torch.arange(T, device = device)) # (T, C)
+
         x = tok_emb + pos_emb
-        x = self.sa_heads(x) # apply head of self attention
-        x = self.ffwd(x)
+        x = self.blocks(x) # apply head of self attention
+        x = self.ln_f(x)
+
         logits = self.lm_head(x) # (B, T, vocab_size)
 
         if targets is None:
@@ -128,7 +151,7 @@ class BigramLanguageModel(torch.nn.Module) :
 
         for _ in range(max_new_tokens) :
 
-            idx_cond = idx[:, -self.block_size:]
+            idx_cond = idx[:, -block_size:]
 
             logits, loss = self(idx_cond)
 
@@ -151,19 +174,6 @@ class Train :
         self.training_data = data[:n]
         self.validation_data = data[n:]
 
-        self.batch_size = 32
-        self.block_size = 8
-        self.max_iters = 5000
-        self.eval_interval = 300
-        self.learning_rate = 1e-3
-        self.device = (
-            "cuda" if torch.cuda.is_available()
-            else "mps" if torch.backends.mps.is_available()
-            else "cpu"
-        )
-        self.eval_iters = 200
-        self.n_embed = 32
-
         self.vocab_size = vocab_size
         self.tokenizer = tokenizer
 
@@ -173,8 +183,8 @@ class Train :
         model.eval()
 
         for split in ['train', 'val']:
-            losses = torch.zeros(self.eval_iters)
-            for k in range(self.eval_iters) :
+            losses = torch.zeros(eval_iters)
+            for k in range(eval_iters) :
                 X, Y = self._get_batch(split)
                 logits, loss = model(X, Y)
                 losses[k] = loss.item()
@@ -184,18 +194,18 @@ class Train :
 
     def run_training(self) :
 
-        model = BigramLanguageModel(vocab_size = self.vocab_size, n_embed= self.n_embed, block_size = self.block_size, device = self.device)
+        model = BigramLanguageModel(vocab_size = self.vocab_size) 
         print("Model initialised")
-        m = model.to(self.device)
+        m = model.to(device)
         print("Model device set")
 
-        optimizer = torch.optim.Adam(model.parameters(), lr = self.learning_rate)
+        optimizer = torch.optim.AdamW(model.parameters(), lr = learning_rate)
         print("Optimiser set")
 
-        for iter in range(self.max_iters):
+        for iter in range(max_iters):
 
-            if iter % self.eval_interval == 0:
-                losses = self.estimate_loss(model)
+            if iter % eval_interval == 0 or iter == max_iters - 1:
+                losses = self.estimate_loss(m)
                 print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
             xb, yb = self._get_batch('train')
@@ -206,7 +216,7 @@ class Train :
             loss.backward()
             optimizer.step()
 
-        context = torch.zeros((1, 1), dtype = torch.long, device = self.device)
+        context = torch.zeros((1, 1), dtype = torch.long, device = device)
 
         print("-----------")
         print("MODEL OUTPUT:")
@@ -217,11 +227,11 @@ class Train :
     def _get_batch(self, split: str) :
         data = self.training_data if split == "train" else self.validation_data
 
-        ix = torch.randint(len(data) - self.block_size, (self.batch_size,))
-        x = torch.stack([data[i: i + self.block_size] for i in ix])
-        y = torch.stack([data[i+1: i + self.block_size + 1] for i in ix])
+        ix = torch.randint(len(data) - block_size, (batch_size,))
+        x = torch.stack([data[i: i + block_size] for i in ix])
+        y = torch.stack([data[i+1: i + block_size + 1] for i in ix])
 
-        x, y = x.to(self.device), y.to(self.device)
+        x, y = x.to(device), y.to(device)
         return x,y
 
 
