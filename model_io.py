@@ -16,7 +16,7 @@ def save_model(model, chars, config, model_name) :
     save_file(cpu_state, model_dir / "model.safetensors")
 
     with open(model_dir / "config.json", "w") as f:
-        json.dump(config, f, index = 4)
+        json.dump(config, f, indent = 4)
 
     with open(model_dir / "chars.txt", "w", encoding ="utf-8") as f:
         f.write("".join(chars))
@@ -36,7 +36,7 @@ def save_checkpoint(model, optimizer, chars, config, model_name):
     )
 
     with open(checkpoint_dir / "config.json", "w") as f:
-        json.dump(config, f, index=4)
+        json.dump(config, f, indent=4)
 
     with open(checkpoint_dir / "chars.txt", "w", encoding="utf-8") as f:
         f.write("".join(chars))
@@ -55,6 +55,8 @@ def load_model(model_class, model_name) :
 
     state_dict = load_file(model_dir / "model.safetensors")
     model.load_state_dict(state_dict)
+
+    return model, chars, config
 
     
 
