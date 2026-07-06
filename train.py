@@ -7,9 +7,9 @@ import model_io
 from tokenizer import Tokenizer
 
 checkpoint_interval = 10000
-batch_size = 64
+batch_size = 128
 block_size = 256
-max_iters = 5000
+max_iters = 50000
 eval_interval = 500
 learning_rate = 3e-4
 device = (
@@ -18,10 +18,10 @@ device = (
     else "cpu"
 )
 eval_iters = 200
-n_embed = 384
+n_embed = 512
 n_head = 6
-n_layer = 6
-dropout = 0.3
+n_layer = 8
+dropout = 0.2
 
 model_name = "jgpt"
 
