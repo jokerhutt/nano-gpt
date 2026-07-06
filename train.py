@@ -7,6 +7,7 @@ import model_io
 from tokenizer import Tokenizer
 
 checkpoint_interval = 10000
+sample_interval = 5000
 batch_size = 128
 block_size = 256
 max_iters = 50000
@@ -19,7 +20,7 @@ device = (
 )
 eval_iters = 200
 n_embed = 512
-n_head = 6
+n_head = 8
 n_layer = 8
 dropout = 0.2
 
@@ -221,15 +222,29 @@ class Train :
             loss.backward()
             optimizer.step()
 
+            # sample model output at sample_interval
+            if iter % sample_interval == 0 and iter > 0:
+                context = torch.zeros((1, 1), dtype=torch.long, device=device)
+
+                sample = self.tokenizer.decode(
+                    m.generate(context, max_new_tokens=200)[0].tolist()
+                )
+
+                print("-----------")
+                print(f"SAMPLE @ STEP {iter}")
+                print("-----------")
+                print(sample)
+
+            # save checkpoint at checkpoint_interval
             if iter % checkpoint_interval == 0 and iter > 0 :
                 config = {"vocab_size": self.vocab_size, "step": iter}
-                    model_io.save_checkpoint(
-                        model=m,
-                        optimizer=optimizer,
-                        chars=self.chars,
-                        config=config,
-                        model_name=model_name,
-                    )
+                model_io.save_checkpoint(
+                    model=m,
+                    optimizer=optimizer,
+                    chars=self.chars,
+                    config=config,
+                    model_name=model_name,
+                )
 
         context = torch.zeros((1, 1), dtype = torch.long, device = device)
 

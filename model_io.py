@@ -36,7 +36,7 @@ def save_checkpoint(model, optimizer, chars, config, model_name):
     )
 
     with open(checkpoint_dir / "config.json", "w") as f:
-        json.dump(config, f, indent=4)
+        json.dump(config, f, index=4)
 
     with open(checkpoint_dir / "chars.txt", "w", encoding="utf-8") as f:
         f.write("".join(chars))
