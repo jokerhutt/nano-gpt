@@ -14,4 +14,6 @@ data/
 /data
 
 models/
+/models
 /checkpoints
+checkpoints/
