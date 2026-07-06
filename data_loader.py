@@ -8,7 +8,11 @@ def load_data() -> str:
 
     texts = []
 
-    for file in Path("data").rglob("*"):
+    files = sorted([f for f in Path("data").rglob("*") if f.suffix in (".txt", ".parquet", ".bz2")])
+
+    total = len(files)
+
+    for i, file in enumerate(files, start=1):
 
         if file.suffix == ".txt":
             texts.append(file.read_text(encoding="utf-8"))
@@ -27,4 +31,8 @@ def load_data() -> str:
                     if body and body not in ("[deleted]", "[removed]"):
                         texts.append(body)
 
+        remaining = total - i
+        print(f"[{i}/{total}] Loaded: {file.name} | Remaining: {remaining}")
+
     return "\n\n".join(texts)
+
