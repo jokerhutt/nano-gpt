@@ -1,10 +1,11 @@
 from pathlib import Path
-import data_loader
-from tokenizer import Tokenizer
+import loader
+from model.tokenizer import Tokenizer
 import pandas as pd
 import torch
 
-from train import Train
+from training.trainer import Trainer
+
 
 
 def main():
@@ -12,7 +13,7 @@ def main():
 
     torch.manual_seed(1337)
 
-    text = data_loader.load_data()
+    text = loader.load_data()
 
     print("Length of dataset in chars: ", len(text))
     print(text[:1000])
@@ -28,7 +29,7 @@ def main():
     data = tokenizer.tokenize_data(text)
 
     # training
-    training = Train(data, vocab_size, tokenizer, chars)
+    training = Trainer(data, vocab_size, tokenizer, chars)
     training.run_training()
 
 if __name__ == "__main__":

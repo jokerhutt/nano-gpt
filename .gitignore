@@ -10,10 +10,7 @@ wheels/
 .venv
 
 # data
-data/
-/data
-
-models/
-/models
-/checkpoints
-checkpoints/
+/data/
+/outputs/
+/models/
+/checkpoints/
