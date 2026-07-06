@@ -3,8 +3,10 @@
 import torch
 import math
 
+import model_io
 from tokenizer import Tokenizer
 
+checkpoint_interval = 10000
 batch_size = 64
 block_size = 256
 max_iters = 5000
@@ -20,6 +22,8 @@ n_embed = 384
 n_head = 6
 n_layer = 6
 dropout = 0.3
+
+model_name = "jgpt"
 
 class Head (torch.nn.Module):
 
@@ -168,7 +172,7 @@ class BigramLanguageModel(torch.nn.Module) :
 
 class Train :
 
-    def __init__(self, data: torch.Tensor, vocab_size: int, tokenizer: Tokenizer) :
+    def __init__(self, data: torch.Tensor, vocab_size: int, tokenizer: Tokenizer, chars: list[str]) :
 
         n = int(0.9*len(data))
         self.training_data = data[:n]
@@ -176,6 +180,7 @@ class Train :
 
         self.vocab_size = vocab_size
         self.tokenizer = tokenizer
+        self.chars = chars
 
     @torch.no_grad
     def estimate_loss(self, model: BigramLanguageModel) :
@@ -216,12 +221,26 @@ class Train :
             loss.backward()
             optimizer.step()
 
+            if iter % checkpoint_interval == 0 and iter > 0 :
+                config = {"vocab_size": self.vocab_size, "step": iter}
+                    model_io.save_checkpoint(
+                        model=m,
+                        optimizer=optimizer,
+                        chars=self.chars,
+                        config=config,
+                        model_name=model_name,
+                    )
+
         context = torch.zeros((1, 1), dtype = torch.long, device = device)
 
         print("-----------")
         print("MODEL OUTPUT:")
         print("-----------")
         print(self.tokenizer.decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+
+        config = {"vocab_size": self.vocab_size}
+        model_io.save_model(model = m, chars = self.chars, config = config, model_name = model_name) 
+
 
     # get batch_size amount of random contiguous items of length block_size each
     def _get_batch(self, split: str) :

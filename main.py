@@ -1,4 +1,5 @@
 from pathlib import Path
+import data_loader
 from tokenizer import Tokenizer
 import pandas as pd
 import torch
@@ -11,17 +12,7 @@ def main():
 
     torch.manual_seed(1337)
 
-    texts = []
-
-    for file in Path("data").iterdir():
-        if file.suffix == ".txt":
-            texts.append(file.read_text(encoding="utf-8"))
-
-        elif file.suffix == ".parquet":
-            df = pd.read_parquet(file)
-            texts.extend(df["text"].dropna().tolist())
-
-    text = "\n\n".join(texts)
+    text = data_loader.load_data()
 
     print("Length of dataset in chars: ", len(text))
     print(text[:1000])
@@ -37,19 +28,8 @@ def main():
     data = tokenizer.tokenize_data(text)
 
     # training
-    training = Train(data, vocab_size, tokenizer)
+    training = Train(data, vocab_size, tokenizer, chars)
     training.run_training()
-
-
-
-
-
-
-
-
-
-
-
 
 if __name__ == "__main__":
     main()
