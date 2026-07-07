@@ -1,3 +1,5 @@
+# ∴ Jokerhut / src/model/config.py
+
 
 import torch
 

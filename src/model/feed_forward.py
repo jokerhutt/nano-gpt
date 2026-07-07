@@ -1,3 +1,5 @@
+# ∴ Jokerhut / src/model/feed_forward.py
+
 import torch
 from src.model import config
 

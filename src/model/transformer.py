@@ -1,3 +1,5 @@
+# ∴ Jokerhut / src/model/transformer.py
+
 
 import torch
 

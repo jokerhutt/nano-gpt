@@ -1,3 +1,5 @@
+# ∴ Jokerhut / src/model/head.py
+
 import torch
 from src.model import config
 

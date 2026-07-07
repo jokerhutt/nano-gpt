@@ -1,3 +1,5 @@
+# ∴ Jokerhut / src/model/block.py
+
 
 import torch
 from src.model.attention import MultiHeadAttention

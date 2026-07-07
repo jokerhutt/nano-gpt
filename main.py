@@ -1,3 +1,5 @@
+# ∴ Jokerhut / main.py
+
 from pathlib import Path
 import loader
 from src.model.tokenizer import Tokenizer

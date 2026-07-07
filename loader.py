@@ -1,3 +1,5 @@
+# ∴ Jokerhut / loader.py
+
 from pathlib import Path
 import bz2
 import json
