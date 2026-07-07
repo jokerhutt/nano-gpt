@@ -1,7 +1,7 @@
 
 import torch
 
-from model.block import Block
+from src.model.block import Block
 from src.model import config
 
 
@@ -21,7 +21,7 @@ class JGPT(torch.nn.Module) :
         self.token_embedding_table = torch.nn.Embedding(vocab_size, self.n_embed)
         self.position_embedding_table = torch.nn.Embedding(self.block_size, self.n_embed)
         
-        self.blocks = torch.nn.Sequential(*[Block(self.n_embed, self.n_head) for _ in range(n_layer)])
+        self.blocks = torch.nn.Sequential(*[Block(self.n_embed, config.n_head) for _ in range(config.n_layer)])
         self.ln_f = torch.nn.LayerNorm(self.n_embed)
         self.lm_head = torch.nn.Linear(self.n_embed, vocab_size)
 

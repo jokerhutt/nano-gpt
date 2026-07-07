@@ -1,7 +1,7 @@
 
 import torch
-from model.attention import MultiHeadAttention
-from model.feed_forward import FeedForward
+from src.model.attention import MultiHeadAttention
+from src.model.feed_forward import FeedForward
 
 
 class Block(torch.nn.Module) :

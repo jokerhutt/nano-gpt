@@ -1,7 +1,7 @@
 
 import torch
 
-from model.head import Head
+from src.model.head import Head
 from src.model import config
 
 

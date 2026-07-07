@@ -1,10 +1,10 @@
 from pathlib import Path
 import loader
-from model.tokenizer import Tokenizer
+from src.model.tokenizer import Tokenizer
 import pandas as pd
 import torch
 
-from training.trainer import Trainer
+from src.training.trainer import Trainer
 
 
 

@@ -1,8 +1,8 @@
 
 import torch
 
-from model.tokenizer import Tokenizer
-from model.transformer import JGPT
+from src.model.tokenizer import Tokenizer
+from src.model.transformer import JGPT
 
 import model_io
 from src.model import config
@@ -46,7 +46,7 @@ class Trainer :
         model.train()
         return out
 
-    def run_training(self) :
+    def run_training(self, max_new_tokens = 500, max_new_sampling_tokens = 200) :
 
         model = JGPT(vocab_size = self.vocab_size) 
         print("Model initialised")
@@ -75,7 +75,7 @@ class Trainer :
                 context = torch.zeros((1, 1), dtype=torch.long, device=self.device)
 
                 sample = self.tokenizer.decode(
-                    m.generate(context, max_new_tokens=200)[0].tolist()
+                    m.generate(context, max_new_tokens=max_new_sampling_tokens)[0].tolist()
                 )
 
                 print("-----------")
@@ -99,7 +99,7 @@ class Trainer :
         print("-----------")
         print("MODEL OUTPUT:")
         print("-----------")
-        print(self.tokenizer.decode(m.generate(context, max_new_tokens=500)[0].tolist()))
+        print(self.tokenizer.decode(m.generate(context, max_new_tokens=max_new_tokens)[0].tolist()))
 
         config = {"vocab_size": self.vocab_size}
         model_io.save_model(model = m, chars = self.chars, config = config, model_name = self.model_name) 
