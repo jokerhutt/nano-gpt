@@ -7,8 +7,10 @@ import json
 from safetensors.torch import save_file, load_file
 import torch
 
+from src.model.tokenizers import load_tokenizer
 
-def save_model(model, chars, config, model_name) :
+
+def save_model(model, tokenizer, config, model_name) :
 
     model_dir = Path("models") / model_name
     model_dir.mkdir(parents = True, exist_ok = True)
@@ -20,11 +22,10 @@ def save_model(model, chars, config, model_name) :
     with open(model_dir / "config.json", "w") as f:
         json.dump(config, f, indent = 4)
 
-    with open(model_dir / "chars.txt", "w", encoding ="utf-8") as f:
-        f.write("".join(chars))
+    tokenizer.save(model_dir)
 
 
-def save_checkpoint(model, optimizer, chars, config, model_name):
+def save_checkpoint(model, optimizer, tokenizer, config, model_name):
 
     checkpoint_dir = Path("checkpoints") / model_name
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -40,8 +41,7 @@ def save_checkpoint(model, optimizer, chars, config, model_name):
     with open(checkpoint_dir / "config.json", "w") as f:
         json.dump(config, f, indent=4)
 
-    with open(checkpoint_dir / "chars.txt", "w", encoding="utf-8") as f:
-        f.write("".join(chars))
+    tokenizer.save(checkpoint_dir)
 
 def load_model(model_class, model_name) :
 
@@ -50,15 +50,11 @@ def load_model(model_class, model_name) :
     with open(model_dir / "config.json") as f:
         config = json.load(f)
 
-    with open(model_dir / "chars.txt", "r", encoding = "utf-8") as f :
-        chars = list(f.read())
+    tokenizer = load_tokenizer(model_dir, config.get("tokenizer_type", "character"))
 
     model = model_class(config["vocab_size"])
 
     state_dict = load_file(model_dir / "model.safetensors")
     model.load_state_dict(state_dict)
 
-    return model, chars, config
-
-    
-
+    return model, tokenizer, config

@@ -9,5 +9,6 @@ dependencies = [
     "pyarrow>=24.0.0",
     "questionary>=2.1.1",
     "safetensors>=0.8.0",
+    "sentencepiece>=0.2.1",
     "torch>=2.12.1",
 ]

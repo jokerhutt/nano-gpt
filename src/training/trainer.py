@@ -3,7 +3,7 @@
 
 import torch
 
-from src.model.tokenizer import Tokenizer
+from src.model.tokenizers.base import BaseTokenizer
 from src.model.transformer import JGPT
 
 import model_io
@@ -12,7 +12,7 @@ from src.model import config
 
 class Trainer :
 
-    def __init__(self, data: torch.Tensor, vocab_size: int, tokenizer: Tokenizer, chars: list[str]) :
+    def __init__(self, data: torch.Tensor, vocab_size: int, tokenizer: BaseTokenizer) :
 
         n = int(0.9*len(data))
         self.training_data = data[:n]
@@ -28,10 +28,10 @@ class Trainer :
         self.batch_size = config.batch_size
         self.learning_rate = config.learning_rate
         self.model_name = config.model_name
+        self.tokenizer_type = config.tokenizer_type
 
         self.vocab_size = vocab_size
         self.tokenizer = tokenizer
-        self.chars = chars
 
     @torch.no_grad
     def estimate_loss(self, model: JGPT) :
@@ -87,11 +87,11 @@ class Trainer :
 
             # save checkpoint at checkpoint_interval
             if iter % self.checkpoint_interval == 0 and iter > 0 :
-                config = {"vocab_size": self.vocab_size, "step": iter}
+                config = {"vocab_size": self.vocab_size, "step": iter, "tokenizer_type": self.tokenizer_type}
                 model_io.save_checkpoint(
                     model=m,
                     optimizer=optimizer,
-                    chars=self.chars,
+                    tokenizer=self.tokenizer,
                     config=config,
                     model_name=self.model_name,
                 )
@@ -103,8 +103,8 @@ class Trainer :
         print("-----------")
         print(self.tokenizer.decode(m.generate(context, max_new_tokens=max_new_tokens)[0].tolist()))
 
-        config = {"vocab_size": self.vocab_size}
-        model_io.save_model(model = m, chars = self.chars, config = config, model_name = self.model_name) 
+        config = {"vocab_size": self.vocab_size, "tokenizer_type": self.tokenizer_type}
+        model_io.save_model(model = m, tokenizer = self.tokenizer, config = config, model_name = self.model_name)
 
 
     # get batch_size amount of random contiguous items of length block_size each

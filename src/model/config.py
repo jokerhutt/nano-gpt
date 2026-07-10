@@ -3,6 +3,12 @@
 
 import torch
 
+# sentencepiece | character
+tokenizer_type = "sentencepiece"
+
+# vocab size for sp tokenizer (ignore for char one)
+sp_vocab_size = 8000
+
 checkpoint_interval = 10000
 sample_interval = 5000
 

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import loader
-from src.model.tokenizer import Tokenizer
+from src.model.tokenizers import build_tokenizer
 import pandas as pd
 import torch
 
@@ -20,18 +20,16 @@ def main():
     print("Length of dataset in chars: ", len(text))
     print(text[:1000])
 
-    chars = sorted(list(set(text)))
-    vocab_size = len(chars)
+    # tokenize and encode using the tokenizer selected in config
+    tokenizer = build_tokenizer(text)
+    vocab_size = tokenizer.vocab_size
 
-    print(''.join(chars))
-    print(vocab_size)
+    print("vocab size: ", vocab_size)
 
-    # tokenize and encode
-    tokenizer = Tokenizer(chars = chars)
     data = tokenizer.tokenize_data(text)
 
     # training
-    training = Trainer(data, vocab_size, tokenizer, chars)
+    training = Trainer(data, vocab_size, tokenizer)
     training.run_training()
 
 if __name__ == "__main__":

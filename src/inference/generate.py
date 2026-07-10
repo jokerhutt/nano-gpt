@@ -14,7 +14,8 @@ import questionary
 import torch
 from safetensors.torch import load_file
 
-from src.model.tokenizer import Tokenizer
+from src.model.tokenizers import load_tokenizer
+from src.model.tokenizers.base import BaseTokenizer
 from src.model.transformer import JGPT
 from src.model import config
 
@@ -41,13 +42,13 @@ def select_model() -> Path:
     return CHECKPOINTS_DIR / model_name
 
 
-def load_checkpoint(checkpoint_dir: Path) -> tuple[JGPT, Tokenizer]:
+def load_checkpoint(checkpoint_dir: Path) -> tuple[JGPT, BaseTokenizer]:
 
     with open(checkpoint_dir / "config.json") as f:
         cfg = json.load(f)
 
-    with open(checkpoint_dir / "chars.txt", "r", encoding="utf-8") as f:
-        chars = list(f.read())
+    # default to character for older checkpoints saved before tokenizer_type existed
+    tokenizer = load_tokenizer(checkpoint_dir, cfg.get("tokenizer_type", "character"))
 
     model = JGPT(vocab_size=cfg["vocab_size"])
     state_dict = load_file(checkpoint_dir / "model.safetensors")
@@ -56,7 +57,7 @@ def load_checkpoint(checkpoint_dir: Path) -> tuple[JGPT, Tokenizer]:
     model = model.to(config.device)
     model.eval()
 
-    return model, Tokenizer(chars)
+    return model, tokenizer
 
 
 def main():
