@@ -6,6 +6,21 @@ import torch
 class BaseTokenizer:
 
     @property
+    def bos_token_id(self) -> int | None:
+        """Return the beginning-of-sequence token id, if this tokenizer has one."""
+        return None
+
+    @property
+    def eos_token_id(self) -> int | None:
+        """Return the end-of-sequence token id, if this tokenizer has one."""
+        return None
+
+    @property
+    def unk_token_id(self) -> int | None:
+        """Return the unknown-token id, if this tokenizer has one."""
+        return None
+
+    @property
     def vocab_size(self):
         raise NotImplementedError
 

@@ -74,10 +74,16 @@ class Trainer :
 
             # sample model output at sample_interval
             if iter % self.sample_interval == 0 and iter > 0:
-                context = torch.zeros((1, 1), dtype=torch.long, device=self.device)
+                # Seed from real training text rather than token 0, which is
+                # SentencePiece's <unk> token.
+                context = self.training_data[:1].unsqueeze(0).to(self.device)
 
                 sample = self.tokenizer.decode(
-                    m.generate(context, max_new_tokens=max_new_sampling_tokens)[0].tolist()
+                    m.generate_inference(
+                        context,
+                        max_new_tokens=max_new_sampling_tokens,
+                        eos_token_id=self.tokenizer.eos_token_id,
+                    )[0].tolist()
                 )
 
                 print("-----------")
@@ -96,12 +102,18 @@ class Trainer :
                     model_name=self.model_name,
                 )
 
-        context = torch.zeros((1, 1), dtype = torch.long, device = self.device)
+        context = self.training_data[:1].unsqueeze(0).to(self.device)
 
         print("-----------")
         print("MODEL OUTPUT:")
         print("-----------")
-        print(self.tokenizer.decode(m.generate(context, max_new_tokens=max_new_tokens)[0].tolist()))
+        print(self.tokenizer.decode(
+            m.generate_inference(
+                context,
+                max_new_tokens=max_new_tokens,
+                eos_token_id=self.tokenizer.eos_token_id,
+            )[0].tolist()
+        ))
 
         config = {"vocab_size": self.vocab_size, "tokenizer_type": self.tokenizer_type}
         model_io.save_model(model = m, tokenizer = self.tokenizer, config = config, model_name = self.model_name)
@@ -117,7 +129,6 @@ class Trainer :
 
         x, y = x.to(self. device), y.to(self.device)
         return x,y
-
 
 
 

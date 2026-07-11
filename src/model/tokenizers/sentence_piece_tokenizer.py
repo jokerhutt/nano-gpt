@@ -20,6 +20,21 @@ class SentencePieceTokenizer(BaseTokenizer):
     def vocab_size(self) -> int:
         return self.sp.vocab_size()
 
+    @property
+    def bos_token_id(self) -> int | None:
+        token_id = self.sp.bos_id()
+        return token_id if token_id >= 0 else None
+
+    @property
+    def eos_token_id(self) -> int | None:
+        token_id = self.sp.eos_id()
+        return token_id if token_id >= 0 else None
+
+    @property
+    def unk_token_id(self) -> int | None:
+        token_id = self.sp.unk_id()
+        return token_id if token_id >= 0 else None
+
     def encode(self, text: str) -> list[int]:
         return self.sp.encode(text, out_type=int)
 

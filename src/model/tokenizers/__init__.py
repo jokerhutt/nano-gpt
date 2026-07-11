@@ -56,6 +56,13 @@ def _ensure_sentencepiece_model(text: str) -> Path:
         model_prefix=str(prefix),
         model_type="bpe",
         vocab_size=config.sp_vocab_size,
+        # These are SentencePiece control symbols.  Do not add <EOS> as a
+        # user-defined symbol: it must remain a special token so generation
+        # can stop on it.
+        unk_id=0,
+        bos_id=1,
+        eos_id=2,
+        pad_id=-1,
         character_coverage=1.0,
         input_sentence_size=1_000_000,
         shuffle_input_sentence=True,

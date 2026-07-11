@@ -23,6 +23,7 @@ from src.model import config
 # anchor to the repo root so this works regardless of the current directory
 CHECKPOINTS_DIR = REPO_ROOT / "checkpoints"
 MAX_NEW_TOKENS = 1000
+DEFAULT_PROMPT = "The "
 
 
 def select_model() -> Path:
@@ -65,10 +66,22 @@ def main():
     checkpoint_dir = select_model()
     model, tokenizer = load_checkpoint(checkpoint_dir)
 
-    context = torch.zeros((1, 1), dtype=torch.long, device=config.device)
+    # Use real text as a seed.  Token 0 is SentencePiece's <unk> control token
+    # and is not a useful prompt for generation.
+    prompt_tokens = tokenizer.encode(DEFAULT_PROMPT)
+    if not prompt_tokens:
+        raise RuntimeError(f"The generation prompt could not be tokenized: {DEFAULT_PROMPT!r}")
+    if tokenizer.unk_token_id in prompt_tokens:
+        raise RuntimeError(
+            f"The generation prompt contains an unknown token: {DEFAULT_PROMPT!r}"
+        )
+    context = torch.tensor([prompt_tokens], dtype=torch.long, device=config.device)
 
-    with torch.no_grad():
-        tokens = model.generate(context, max_new_tokens=MAX_NEW_TOKENS)[0].tolist()
+    tokens = model.generate_inference(
+        context,
+        max_new_tokens=MAX_NEW_TOKENS,
+        eos_token_id=tokenizer.eos_token_id,
+    )[0].tolist()
 
     print(tokenizer.decode(tokens))
 

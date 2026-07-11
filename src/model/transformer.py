@@ -72,47 +72,49 @@ class JGPT(torch.nn.Module) :
             top_p: int | None = None, 
             max_new_tokens: int = 512
     ) :
-        for _ in range(max_new_tokens) : 
+        if temperature <= 0:
+            raise ValueError("temperature must be greater than zero")
 
-            # Keep only context window
-            idx_cond = idx[:, -self.block_size:]
+        was_training = self.training
+        self.eval()
+        try:
+            with torch.no_grad():
+                for _ in range(max_new_tokens):
+                    # Keep only the context window, then sample from the
+                    # distribution for its final position.
+                    idx_cond = idx[:, -self.block_size:]
+                    logits, _ = self(idx_cond)
+                    logits = logits[:, -1, :] / temperature
 
-            # forward pass
-            logits = _ = self(idx_cond)
+                    if top_k is not None:
+                        k = min(top_k, logits.size(-1))
+                        if k <= 0:
+                            raise ValueError("top_k must be greater than zero")
+                        threshold = torch.topk(logits, k, dim=-1).values[:, [-1]]
+                        logits = logits.masked_fill(logits < threshold, float("-inf"))
 
-            # Temp
-            logits = logits / temperature
+                    if top_p is not None:
+                        if not 0 < top_p <= 1:
+                            raise ValueError("top_p must be in the range (0, 1]")
+                        sorted_logits, sorted_indices = torch.sort(logits, descending=True)
+                        remove = torch.cumsum(
+                            torch.softmax(sorted_logits, dim=-1), dim=-1
+                        ) > top_p
+                        remove[:, 1:] = remove[:, :-1].clone()
+                        remove[:, 0] = False
+                        sorted_logits = sorted_logits.masked_fill(remove, float("-inf"))
+                        logits = torch.zeros_like(logits).scatter(1, sorted_indices, sorted_logits)
 
-            # Top-k sampling
-            if top_k is not None:
-                values, _ = torch.topk(logits, top_k)
-                logits[logits < values[:, [-1]]] = float("-inf")
+                    probs = torch.softmax(logits, dim=-1)
+                    idx_next = torch.multinomial(probs, num_samples=1)
+                    idx = torch.cat((idx, idx_next), dim=1)
 
-            probs = torch.softmax(logits, dim=-1)
-
-            idx_next = torch.multinomial(probs, num_samples = 1)
-
-            idx = torch.cat((idx, idx_next), dim = 1)
-
-            if eos_token_id is not None and idx_next.item() == eos_token_id:
-                break
+                    if eos_token_id is not None and torch.all(idx_next == eos_token_id):
+                        break
+        finally:
+            self.train(was_training)
 
         return idx
 
     def generate(self, idx, max_new_tokens) :
-
-        for _ in range(max_new_tokens) :
-
-            idx_cond = idx[:, -self.block_size:]
-
-            logits, loss = self(idx_cond)
-
-            logits = logits[:, -1, :]
-
-            probs = torch.nn.functional.softmax(logits, dim=1)
-
-            idx_next = torch.multinomial(probs, num_samples = 1)
-
-            idx = torch.cat((idx, idx_next), dim = 1)
-
-        return idx
+        return self.generate_inference(idx, max_new_tokens=max_new_tokens)
