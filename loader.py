@@ -10,7 +10,9 @@ def load_data() -> str:
 
     texts = []
 
-    files = sorted([f for f in Path("data").rglob("*") if f.suffix in (".txt", ".parquet", ".bz2")])
+    files = sorted(
+        [f for f in Path("data").rglob("*") if f.suffix in (".txt", ".json", ".parquet", ".bz2")]
+    )
 
     total = len(files)
 
@@ -18,6 +20,18 @@ def load_data() -> str:
 
         if file.suffix == ".txt":
             texts.append(file.read_text(encoding="utf-8"))
+
+        elif file.suffix == ".json":
+            data = json.loads(file.read_text(encoding="utf-8"))
+            records = data if isinstance(data, list) else [data]
+
+            for record in records:
+                if isinstance(record, str):
+                    texts.append(record)
+                elif isinstance(record, dict):
+                    body = record.get("text") or record.get("body")
+                    if body and body not in ("[deleted]", "[removed]"):
+                        texts.append(body)
 
         elif file.suffix == ".parquet":
             df = pd.read_parquet(file)
@@ -37,4 +51,3 @@ def load_data() -> str:
         print(f"[{i}/{total}] Loaded: {file.name} | Remaining: {remaining}")
 
     return "\n\n".join(texts)
-

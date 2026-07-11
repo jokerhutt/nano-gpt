@@ -12,6 +12,7 @@ wheels/
 # data
 /data/
 /outputs/
+/archive/
 /models/
 /checkpoints/
 /spm/
