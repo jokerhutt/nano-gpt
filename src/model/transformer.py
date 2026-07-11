@@ -63,6 +63,42 @@ class JGPT(torch.nn.Module) :
 
         return logits, loss
 
+    def generate_inference(
+            self, 
+            idx: torch.Tensor, 
+            eos_token_id: int | None = None, 
+            temperature: float = 1.0, 
+            top_k: int | None = None, 
+            top_p: int | None = None, 
+            max_new_tokens: int = 512
+    ) :
+        for _ in range(max_new_tokens) : 
+
+            # Keep only context window
+            idx_cond = idx[:, -self.block_size:]
+
+            # forward pass
+            logits = _ = self(idx_cond)
+
+            # Temp
+            logits = logits / temperature
+
+            # Top-k sampling
+            if top_k is not None:
+                values, _ = torch.topk(logits, top_k)
+                logits[logits < values[:, [-1]]] = float("-inf")
+
+            probs = torch.softmax(logits, dim=-1)
+
+            idx_next = torch.multinomial(probs, num_samples = 1)
+
+            idx = torch.cat((idx, idx_next), dim = 1)
+
+            if eos_token_id is not None and idx_next.item() == eos_token_id:
+                break
+
+        return idx
+
     def generate(self, idx, max_new_tokens) :
 
         for _ in range(max_new_tokens) :
